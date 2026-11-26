@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>La lata de área mínima</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+
+  <style>
+    /* ==========================================================
+       1. COLORES (tema claro y oscuro)
+       ========================================================== */
+    :root {
+      --bg: #EDF0F3;      /* fondo de la página */
+      --panel: #FFFFFF;   /* tarjetas */
+      --ink: #12202D;     /* texto principal */
+      --ink2: #51606E;    /* texto secundario */
+      --line: #D5DBE1;    /* bordes y rejilla */
+      --fill: #D9E2EC;    /* relleno de la lata */
+      --acc: #1F5FBF;     /* acento: curva, mínimo, botón principal */
+      --dot: #D9480F;     /* punto que se mueve */
+
+      box-sizing: border-box;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #0F161D; --panel: #17212B; --ink: #E8EDF2; --ink2: #9AA8B6;
+        --line: #2A3745; --fill: #223446; --acc: #5B9BF0; --dot: #FF8A4C;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #0F161D; --panel: #17212B; --ink: #E8EDF2; --ink2: #9AA8B6;
+      --line: #2A3745; --fill: #223446; --acc: #5B9BF0; --dot: #FF8A4C;
+    }
+
+    /* ==========================================================
+       2. BASE
+       ========================================================== */
+    html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+    *    { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 17px/1.6 "Source Sans 3", system-ui, sans-serif;
+    }
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+    :focus-visible { outline: 3px solid var(--dot); outline-offset: 2px; }
+
+    /* ==========================================================
+       3. TIPOGRAFÍA
+       ========================================================== */
+    h1 {
+      margin: 0 0 12px;
+      font: 600 clamp(34px, 6vw, 56px)/1.05 "Barlow Semi Condensed", system-ui, sans-serif;
+      letter-spacing: -.01em;
+    }
+    h2 {
+      margin: 40px 0 12px;
+      font: 600 24px/1.2 "Barlow Semi Condensed", system-ui, sans-serif;
+    }
+    p { margin: 0 0 12px; max-width: 68ch; color: var(--ink2); }
+    .note { font-size: 15px; margin-top: 12px; }
+
+    /* ==========================================================
+       4. COMPONENTES
+       ========================================================== */
+
+    /* Tarjeta */
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    /* Controles: volumen, deslizador y botones */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px 24px;
+      align-items: end;
+      margin: 24px 0 16px;
+    }
+    .controls label { display: block; margin-bottom: 4px; font-size: 14px; color: var(--ink2); }
+    .controls .grow { flex: 1; min-width: 220px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    input[type=number] {
+      width: 110px;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--ink);
+      font: inherit;
+    }
+    input[type=range] { width: 100%; accent-color: var(--acc); }
+
+    button {
+      padding: 8px 14px;
+      border: 1px solid var(--acc);
+      border-radius: 6px;
+      background: var(--acc);
+      color: #fff;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.secondary { background: transparent; color: var(--acc); }
+
+    /* Datos en vivo */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .stat b {
+      display: block;
+      font: 600 30px/1.1 "Barlow Semi Condensed", system-ui, sans-serif;
+    }
+    .stat span { font-size: 14px; color: var(--ink2); }
+    #msg { margin: 0 0 12px; font-weight: 600; color: var(--ink); }
+
+    /* Dibujos: lata y gráfica */
+    .views {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+    }
+    svg { display: block; width: 100%; height: auto; touch-action: none; }
+    svg text { font: 12px "Source Sans 3", system-ui, sans-serif; fill: var(--ink2); }
+    svg text.label-strong { fill: var(--ink); font-weight: 600; }
+
+    /* Razonamiento paso a paso */
+    ol { max-width: 68ch; padding-left: 22px; color: var(--ink2); }
+    li { margin-bottom: 8px; }
+    li b { color: var(--ink); }
+    .f {
+      display: block;
+      margin: 6px 0;
+      padding: 2px 10px;
+      border-left: 3px solid var(--acc);
+      font: 15px ui-monospace, Menlo, Consolas, monospace;
+      color: var(--ink);
+    }
+  </style>
+</head>
+
+<body>
+<main>
+
+  <!-- ===================== ENCABEZADO ===================== -->
+  <header>
+    <h1>La lata de área mínima</h1>
+    <p>Una lata cilíndrica debe guardar un volumen fijo de bebida. Cada centímetro cuadrado de aluminio cuesta dinero. Mueve el radio y encuentra las medidas que gastan menos material.</p>
+  </header>
+
+  <!-- ===================== SIMULACIÓN ===================== -->
+  <section id="simulacion">
+    <h2>Simulación</h2>
+    <p>Mueve el radio con el deslizador o arrastrando sobre la gráfica. Los botones te llevan al mínimo y al máximo de la curva.</p>
+
+    <div class="controls">
+      <div>
+        <label for="vol">Volumen (mL)</label>
+        <input type="number" id="vol" min="100" max="2000" step="5" value="355">
+      </div>
+      <div class="grow">
+        <label for="rs">Radio r: <span id="rl"></span></label>
+        <input type="range" id="rs" step="0.01">
+      </div>
+      <div class="actions">
+        <button id="bopt" type="button">Ir al mínimo</button>
+        <button id="bmax" type="button" class="secondary">Ir al máximo</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="panel stat"><b id="sr">-</b><span>Radio r</span></div>
+      <div class="panel stat"><b id="sh">-</b><span>Altura h</span></div>
+      <div class="panel stat"><b id="sa">-</b><span>Área de aluminio A</span></div>
+      <div class="panel stat"><b id="sq">-</b><span>Relación h / 2r</span></div>
+    </div>
+    <p id="msg" aria-live="polite"></p>
+
+    <div class="views">
+      <!-- Dibujo de la lata -->
+      <div class="panel">
+        <svg id="can" viewBox="0 0 260 260" role="img" aria-label="Dibujo de la lata con el radio elegido">
+          <path id="body" fill="var(--fill)" stroke="var(--acc)" stroke-width="2" stroke-linejoin="round"/>
+          <ellipse id="top" fill="var(--panel)" stroke="var(--acc)" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <!-- Gráfica de A(r) -->
+      <div class="panel">
+        <svg id="cur" viewBox="0 0 340 260" role="img" aria-label="Gráfica del área en función del radio, con el mínimo y el máximo del rango marcados. Arrastra para cambiar el radio.">
+          <g id="grid"></g>
+          <path id="curve" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+
+          <!-- Guías del mínimo -->
+          <line id="vopt" stroke="var(--ink2)" stroke-dasharray="4 4"/>
+          <line id="hopt" stroke="var(--ink2)" stroke-dasharray="4 4"/>
+          <text id="topt" class="label-strong" text-anchor="middle"></text>
+
+          <!-- Marcadores de mínimo y máximo -->
+          <circle id="minMark" r="5" fill="var(--acc)" stroke="var(--panel)" stroke-width="2"/>
+          <circle id="maxMark" r="5" fill="var(--panel)" stroke="var(--acc)" stroke-width="2.5"/>
+          <text id="tmax" class="label-strong" text-anchor="end"></text>
+
+          <!-- Punto que se mueve -->
+          <circle id="pt" r="6" fill="var(--dot)" stroke="var(--panel)" stroke-width="2"/>
+
+          <text x="195" y="254" text-anchor="middle">Radio r (cm)</text>
+          <text x="8" y="14">A (cm²)</text>
+        </svg>
+      </div>
+    </div>
+
+    <p class="note" id="rangeNote"></p>
+  </section>
+
+  <!-- ===================== RAZONAMIENTO ===================== -->
+  <section id="razonamiento">
+    <h2>Razonamiento paso a paso</h2>
+    <p>Queremos la lata que use menos aluminio y guarde un volumen fijo V. Es un problema de optimización: se escribe lo que se quiere minimizar como función de una sola variable y se busca su mínimo con derivadas.</p>
+
+    <ol>
+      <li><b>Datos y fórmulas.</b> La lata es un cilindro de radio r y altura h.
+        <span class="f">Volumen: V = πr²h (es fijo)</span>
+        <span class="f">Área: A = 2πr² + 2πrh</span>
+        El término 2πr² son las dos tapas (dos círculos de área πr²) y 2πrh es la pared lateral (un rectángulo de largo 2πr y alto h).</li>
+
+      <li><b>Despejar h.</b> Como V es constante, la altura depende del radio:
+        <span class="f">h = V / (πr²)</span></li>
+
+      <li><b>Dejar el área en una sola variable.</b> Sustituimos h en A:
+        <span class="f">A(r) = 2πr² + 2πr · V/(πr²) = 2πr² + 2V/r</span>
+        El dominio es r &gt; 0. Si r es muy pequeño, la lata sería altísima y A crece; si r es muy grande, la lata sería casi plana y A también crece. Por eso esperamos un mínimo en medio.</li>
+
+      <li><b>Derivar.</b> Con (2V/r)′ = −2V/r²:
+        <span class="f">A′(r) = 4πr − 2V/r²</span></li>
+
+      <li><b>Punto crítico.</b> Igualamos A′(r) = 0 y despejamos:
+        <span class="f">4πr = 2V/r²  →  4πr³ = 2V  →  r³ = V/(2π)</span>
+        <span class="f">r* = ∛(V / 2π)</span>
+        Con el volumen de la simulación, r* = <b id="d1"></b></li>
+
+      <li><b>Confirmar que es un mínimo.</b> Segunda derivada:
+        <span class="f">A″(r) = 4π + 4V/r³</span>
+        Para todo r &gt; 0 es positiva, así que la curva es cóncava hacia arriba y el punto crítico es un mínimo. Como A crece hacia infinito cuando r tiende a 0 y cuando r tiende a infinito, es el mínimo global.</li>
+
+      <li><b>Altura óptima.</b> De r*³ = V/(2π) sale V = 2πr*³. Entonces:
+        <span class="f">h* = V/(πr*²) = 2πr*³/(πr*²) = 2r*</span>
+        La lata óptima tiene altura igual a su diámetro. Aquí h* = <b id="d2"></b></li>
+
+      <li><b>Área mínima.</b> Usando otra vez V = 2πr*³, el término 2V/r* vale 4πr*², y entonces:
+        <span class="f">A* = 2πr*² + 4πr*² = 6πr*²</span>
+        Aquí A* = <b id="d3"></b></li>
+
+      <li><b>¿Y el máximo?</b> A′(r) solo se anula en r*, y ahí hay un mínimo. Como A crece sin límite cuando r tiende a 0 y cuando r tiende a infinito, la función no tiene un máximo absoluto. Dentro del rango que dibuja la gráfica, el valor más alto está en un extremo; el botón «Ir al máximo» te lleva ahí.</li>
+    </ol>
+  </section>
+
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ==========================================================
+     1. CONSTANTES Y ATAJOS
+     ========================================================== */
+  const PI = Math.PI;
+  const $  = (id) => document.getElementById(id);
+
+  // Área de la gráfica dentro del SVG (coordenadas del viewBox 340 × 260)
+  const PLOT = { left: 50, right: 320, top: 20, bottom: 215, width: 340 };
+
+  const slider = $('rs');
+
+  // Valores que dependen del volumen (se calculan en setup)
+  const state = {
+    V: 355,
+    rOpt: 0,    // radio que minimiza el área
+    rLo: 0,     // extremo izquierdo del rango graficado
+    rHi: 0,     // extremo derecho del rango graficado
+    rTop: 0,    // radio donde el área es más alta dentro del rango
+    scaleCan: 1,// escala (px por cm) del dibujo de la lata
+    aLo: 0,     // valor mínimo del eje vertical
+    aHi: 0      // valor máximo del eje vertical
+  };
+
+  /* ==========================================================
+     2. FUNCIONES MATEMÁTICAS Y DE FORMATO
+     ========================================================== */
+  const fmt = (x, d) =>
+    x.toLocaleString('es-CO', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+  const area   = (r) => 2 * PI * r * r + 2 * state.V / r;   // A(r)
+  const height = (r) => state.V / (PI * r * r);              // h(r)
+
+  // Del mundo (r, A) a coordenadas del SVG
+  const toX = (r) => PLOT.left + (r - state.rLo) / (state.rHi - state.rLo) * (PLOT.right - PLOT.left);
+  const toY = (a) => PLOT.bottom - (a - state.aLo) / (state.aHi - state.aLo) * (PLOT.bottom - PLOT.top);
+
+  const setAttrs = (el, attrs) => {
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+  };
+
+  /* ==========================================================
+     3. CONFIGURACIÓN (cuando cambia el volumen)
+     ========================================================== */
+  function setup() {
+    state.V = Math.max(100, Math.min(2000, parseFloat($('vol').value) || 355));
+    $('vol').value = state.V;
+
+    state.rOpt = Math.cbrt(state.V / (2 * PI));
+    state.rLo  = state.rOpt * 0.5;
+    state.rHi  = state.rOpt * 2;
+    state.rTop = area(state.rLo) > area(state.rHi) ? state.rLo : state.rHi;
+
+    const hMax = height(state.rLo);
+    state.scaleCan = Math.min(230 / (hMax + 0.6 * state.rLo), 110 / state.rHi);
+
+    state.aLo = area(state.rOpt) * 0.96;
+    state.aHi = Math.max(area(state.rLo), area(state.rHi)) * 1.03;
+
+    slider.min   = state.rLo.toFixed(2);
+    slider.max   = state.rHi.toFixed(2);
+    slider.value = (state.rOpt * 0.65).toFixed(2);
+
+    buildGraph();
+    fillExplanation();
+    render();
+  }
+
+  /* ==========================================================
+     4. PARTES ESTÁTICAS DE LA GRÁFICA
+     ========================================================== */
+  function buildGraph() {
+    const { rLo, rHi, rOpt, rTop, aLo, aHi } = state;
+    const aOpt = area(rOpt);
+    let path = '', grid = '';
+
+    // Curva A(r)
+    for (let i = 0; i <= 120; i++) {
+      const r = rLo + (rHi - rLo) * i / 120;
+      path += (i ? 'L' : 'M') + toX(r).toFixed(1) + ',' + toY(area(r)).toFixed(1);
+    }
+    $('curve').setAttribute('d', path);
+
+    // Rejilla y marcas de los ejes
+    for (let i = 0; i <= 4; i++) {
+      const r = rLo + (rHi - rLo) * i / 4;
+      grid += `<text x="${toX(r)}" y="232" text-anchor="middle">${fmt(r, 1)}</text>`;
+    }
+    for (let i = 0; i <= 3; i++) {
+      const a = aLo + (aHi - aLo) * i / 3;
+      grid += `<line x1="${PLOT.left}" x2="${PLOT.right}" y1="${toY(a)}" y2="${toY(a)}" stroke="var(--line)"/>`
+            + `<text x="${PLOT.left - 6}" y="${toY(a) + 4}" text-anchor="end">${fmt(a, 0)}</text>`;
+    }
+    grid += `<line x1="${PLOT.left}" x2="${PLOT.right}" y1="${PLOT.bottom}" y2="${PLOT.bottom}" stroke="var(--ink2)"/>`;
+    $('grid').innerHTML = grid;
+
+    // Mínimo: guías, marcador y etiqueta
+    setAttrs($('vopt'), { x1: toX(rOpt), x2: toX(rOpt), y1: PLOT.top, y2: PLOT.bottom });
+    setAttrs($('hopt'), { x1: PLOT.left, x2: toX(rOpt), y1: toY(aOpt), y2: toY(aOpt) });
+    setAttrs($('minMark'), { cx: toX(rOpt), cy: toY(aOpt) });
+    setAttrs($('topt'), { x: Math.min(toX(rOpt), 270), y: 14 });
+    $('topt').textContent = 'mínimo en r = ' + fmt(rOpt, 2) + ' cm';
+
+    // Máximo del rango: marcador y etiqueta
+    const left = rTop === rLo;
+    setAttrs($('maxMark'), { cx: toX(rTop), cy: toY(area(rTop)) });
+    setAttrs($('tmax'), {
+      x: left ? toX(rTop) + 12 : toX(rTop) - 12,
+      y: toY(area(rTop)) + 4,
+      'text-anchor': left ? 'start' : 'end'
+    });
+    $('tmax').textContent = 'máximo del rango';
+
+    $('rangeNote').textContent =
+      'La curva no tiene un máximo absoluto: el área crece sin límite cuando r tiende a 0 o a infinito. '
+      + 'El botón de máximo salta al valor más alto dentro del rango dibujado (r = ' + fmt(rTop, 2)
+      + ' cm, A = ' + fmt(area(rTop), 1) + ' cm²).';
+  }
+
+  /* ==========================================================
+     5. NÚMEROS DEL RAZONAMIENTO (dependen del volumen)
+     ========================================================== */
+  function fillExplanation() {
+    $('d1').textContent = fmt(state.rOpt, 2) + ' cm';
+    $('d2').textContent = fmt(2 * state.rOpt, 2) + ' cm';
+    $('d3').textContent = fmt(area(state.rOpt), 1) + ' cm²';
+  }
+
+  /* ==========================================================
+     6. DIBUJO (se repite al mover el radio)
+     ========================================================== */
+  function drawCan(r) {
+    const w  = r * state.scaleCan;                 // semiancho
+    const hh = height(r) * state.scaleCan;         // alto del cuerpo
+    const ry = w * 0.3;                            // perspectiva de la elipse
+    const cx = 130;
+    const yTop = (260 - (hh + 2 * ry)) / 2 + ry;
+
+    $('body').setAttribute('d',
+      `M${cx - w},${yTop} L${cx - w},${yTop + hh} ` +
+      `A${w},${ry} 0 0 0 ${cx + w},${yTop + hh} L${cx + w},${yTop} Z`);
+    setAttrs($('top'), { cx, cy: yTop, rx: w, ry });
+  }
+
+  function updateStats(r) {
+    const h = height(r);
+    const a = area(r);
+    $('rl').textContent = fmt(r, 2) + ' cm';
+    $('sr').textContent = fmt(r, 2) + ' cm';
+    $('sh').textContent = fmt(h, 2) + ' cm';
+    $('sa').textContent = fmt(a, 1) + ' cm²';
+    $('sq').textContent = fmt(h / (2 * r), 2);
+  }
+
+  function updateMessage(r) {
+    const tol  = (state.rHi - state.rLo) / 400;
+    const aOpt = area(state.rOpt);
+    const extra = area(r) - aOpt;
+    let text;
+
+    if (Math.abs(r - state.rOpt) < tol) {
+      text = 'Este es el mínimo: con ' + fmt(state.V, 0) + ' mL no se puede gastar menos aluminio.';
+    } else if (Math.abs(r - state.rTop) < tol) {
+      text = 'Este es el máximo del rango dibujado: gastas ' + fmt(extra, 1)
+           + ' cm² más que el mínimo (' + fmt(aOpt, 1) + ' cm²). Fuera del rango, el área sigue creciendo.';
+    } else {
+      text = 'Gastas ' + fmt(extra, 1) + ' cm² más que el mínimo (' + fmt(aOpt, 1) + ' cm²).';
+    }
+    $('msg').textContent = text;
+  }
+
+  function render() {
+    const r = parseFloat(slider.value);
+    drawCan(r);
+    setAttrs($('pt'), { cx: toX(r), cy: toY(area(r)) });
+    updateStats(r);
+    updateMessage(r);
+  }
+
+  /* ==========================================================
+     7. EVENTOS
+     ========================================================== */
+  const goTo = (r) => { slider.value = r.toFixed(2); render(); };
+
+  slider.addEventListener('input', render);
+  $('vol').addEventListener('change', setup);
+  $('bopt').addEventListener('click', () => goTo(state.rOpt));
+  $('bmax').addEventListener('click', () => goTo(state.rTop));
+
+  // Arrastrar sobre la gráfica
+  const graph = $('cur');
+  let dragging = false;
+
+  function radiusFromPointer(ev) {
+    const box = graph.getBoundingClientRect();
+    const x = (ev.clientX - box.left) / box.width * PLOT.width;
+    const r = state.rLo + (x - PLOT.left) / (PLOT.right - PLOT.left) * (state.rHi - state.rLo);
+    goTo(Math.max(state.rLo, Math.min(state.rHi, r)));
+  }
+
+  graph.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    graph.setPointerCapture(e.pointerId);
+    radiusFromPointer(e);
+  });
+  graph.addEventListener('pointermove', (e) => { if (dragging) radiusFromPointer(e); });
+  graph.addEventListener('pointerup',   () => { dragging = false; });
+
+  /* ==========================================================
+     8. INICIO
+     ========================================================== */
+  setup();
+})();
+</script>
+</body>
+</html>
